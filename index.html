@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MapBiomas - Publication Networks</title>
     
+    <!-- Bibliotecas Cytoscape e Layouts Físicos -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
     <script src="https://unpkg.com/layout-base/layout-base.js"></script>
     <script src="https://unpkg.com/cose-base/cose-base.js"></script>
     <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+
+    <!-- Biblioteca do Slider Duplo (noUiSlider) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.js"></script>
 
     <style>
         :root {
@@ -22,115 +27,107 @@
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: var(--mb-gray-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
         header { background-color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mb-card-border); z-index: 10; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        
+        /* Botão Hamburger para recolher o menu esquerdo */
+        #toggle-sidebar { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--mb-dark-green); padding: 0; margin-right: 5px; }
+        #toggle-sidebar:hover { color: var(--mb-green); }
+        
         .logo { font-weight: bold; font-size: 1.4em; color: var(--mb-dark-green); letter-spacing: 1px; }
         .header-title { font-size: 1.2em; border-left: 2px solid #ccc; padding-left: 15px; color: var(--mb-text-main); }
         
-        .year-control { display: flex; flex-direction: column; align-items: flex-end; min-width: 200px; }
-        .year-control label { font-size: 0.85em; color: #666; margin-bottom: 5px; }
-        .year-slider-container { display: flex; align-items: center; gap: 10px; width: 100%; }
-        input[type=range] { flex-grow: 1; accent-color: var(--mb-green); }
-        #yearDisplay { font-weight: bold; color: var(--mb-dark-green); min-width: 40px; text-align: right; }
+        /* Controlo de Anos Global */
+        .year-control { display: flex; flex-direction: column; min-width: 350px; }
+        .year-control label { font-size: 0.85em; color: #666; margin-bottom: 5px; font-weight: bold; }
+        #yearDisplay { color: var(--mb-dark-green); }
+        
+        /* Ajustes do noUiSlider */
+        .noUi-connect { background: var(--mb-green); }
+        .noUi-handle { border-radius: 50%; box-shadow: none; border: 2px solid var(--mb-dark-green); }
+        .noUi-handle::before, .noUi-handle::after { display: none; }
+        .noUi-pips { color: #666; font-size: 0.8em; }
 
         main { display: flex; flex-grow: 1; padding: 20px; gap: 20px; overflow: hidden; }
 
         .card { background: white; border: 1px solid var(--mb-card-border); border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
-        #sidebar-left { width: 300px; overflow-y: auto; }
-        #sidebar-right { width: 300px; overflow-y: auto; }
+        
+        /* Animação e Estilos da Barra Lateral Esquerda */
+        #sidebar-left { transition: width 0.3s ease, opacity 0.3s ease, padding 0.3s ease; width: 300px; opacity: 1; overflow-y: auto; flex-shrink: 0; }
+        #sidebar-left.closed { width: 0; padding-left: 0; padding-right: 0; opacity: 0; border: none; margin: 0; }
+        
+        #sidebar-right { width: 320px; overflow-y: auto; flex-shrink: 0; }
         .card h3 { margin-top: 0; font-size: 1.1em; color: var(--mb-text-main); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px; }
 
         .filter-group { margin-bottom: 20px; }
         .filter-group label { display: block; font-size: 0.85em; font-weight: 600; color: #666; margin-bottom: 6px; }
-        .filter-group input, .filter-group select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .filter-group input[type="text"], .filter-group select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        /* Rádios de Seleção Única */
+        .radio-group label { display: flex; align-items: center; font-size: 0.9em; color: #444; margin-bottom: 5px; cursor: pointer; font-weight: normal; }
+        .radio-group input { margin-right: 8px; cursor: pointer;}
+
         .btn-clear { background-color: #eee; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; color: #555; }
         .btn-clear:hover { background-color: #ddd; }
 
-        /* Contêiner do Grafo com Cursor de Mão */
         #cy-container { flex-grow: 1; background: #ffffff; border: 1px solid var(--mb-card-border); border-radius: 8px; position: relative; overflow: hidden; }
         #cy { width: 100%; height: 100%; cursor: grab; }
-        #cy:active { cursor: grabbing; } /* Cursor muda ao arrastar */
+        #cy:active { cursor: grabbing; }
         
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; color: #666; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; color: #666; background: rgba(255,255,255,0.95); padding: 20px 30px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; font-weight: bold;}
 
-        /* Estilos da Legenda Flutuante */
+        /* Legenda Flutuante Atualizada */
         #legend-container {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 40%; /* Permite scroll se houver muitas categorias */
-            overflow-y: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 50;
-            min-width: 200px;
+            position: absolute; bottom: 20px; left: 20px; background: rgba(255, 255, 255, 0.95); border: 1px solid #ccc; border-radius: 8px; padding: 15px;
+            max-height: 50%; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 50; min-width: 200px;
         }
-        #legend-container h4 { margin: 0 0 10px 0; font-size: 0.95em; color: #333; }
+        #legend-container h4 { margin: 10px 0; font-size: 0.95em; color: #333; }
         .legend-item { display: flex; align-items: center; margin-bottom: 6px; font-size: 0.85em; color: #555; }
         .legend-color { width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; border: 1px solid #999; flex-shrink: 0;}
-
-        /* Estilos dos Botões de Zoom */
-        #zoom-controls {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 50;
-        }
-        .zoom-btn {
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            width: 36px;
-            height: 36px;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #555;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .legend-info-box { font-size: 0.85em; color: #444; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #ccc; }
+        
+        /* Controlos de Zoom */
+        #zoom-controls { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
+        .zoom-btn { background: white; border: 1px solid #ccc; border-radius: 4px; width: 36px; height: 36px; font-size: 1.2em; font-weight: bold; color: #555; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
         .zoom-btn:hover { background: #f0f0f0; color: var(--mb-dark-green); }
 
-        .detail-item { margin-bottom: 12px; font-size: 0.9em; }
-        .detail-label { font-weight: 600; color: #666; display: block; font-size: 0.85em;}
+        /* Estilos do Painel da Direita */
+        .detail-item { margin-bottom: 15px; font-size: 0.9em; }
+        .detail-label { font-weight: 600; color: #666; display: block; font-size: 0.85em; margin-bottom: 3px;}
         .detail-value { color: var(--mb-text-main); word-wrap: break-word;}
-        .tag { background: #e9ecef; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px 2px 2px 0; display: inline-block;}
+        .pub-list { padding-left: 15px; margin: 5px 0; color: #444; }
+        .pub-list li { margin-bottom: 8px; line-height: 1.3; }
+        .pub-year { font-size: 0.85em; color: #888; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-left">
+            <!-- Botão para abrir/fechar o menu lateral esquerdo -->
+            <button id="toggle-sidebar" title="Ocultar/Mostrar Filtros">☰</button>
             <div class="logo">MAPBIOMAS</div>
             <div class="header-title">Scientific publications: network overview</div>
         </div>
+        
         <div class="year-control">
-            <label for="yearSlider">Ano da Publicação</label>
-            <div class="year-slider-container">
-                <input type="range" id="yearSlider" min="2017" max="2026" step="1" value="0">
-                <span id="yearDisplay">Todos</span>
-            </div>
+            <label>Ano da Publicação (Grafo Geral): <span id="yearDisplay">2017 - 2026</span></label>
+            <div id="yearSlider" style="margin-top: 5px; margin-bottom: 15px;"></div>
         </div>
     </header>
 
     <main>
+        <!-- PAINEL ESQUERDO: FILTROS GERAIS -->
         <aside class="card" id="sidebar-left">
             <h3>Filtros & Aparência</h3>
             
             <div class="filter-group">
-                <label for="colorAttribute">Colorir Nós Por:</label>
-                <select id="colorAttribute">
-                    <option value="domain" selected>Domínio (Domain)</option>
-                    <option value="field">Campo (Field)</option>
-                    <option value="subfield">Subcampo (Subfield)</option>
-                    <option value="topic">Tópico (Topic)</option>
-                </select>
+                <label>Colorir Nós Por:</label>
+                <div class="radio-group" id="colorAttribute">
+                    <label><input type="radio" name="colorAttr" value="domain" checked> Domínio (Domain)</label>
+                    <label><input type="radio" name="colorAttr" value="field"> Campo (Field)</label>
+                    <label><input type="radio" name="colorAttr" value="subfield"> Subcampo (Subfield)</label>
+                    <label><input type="radio" name="colorAttr" value="topic"> Tópico (Topic)</label>
+                </div>
             </div>
 
             <div class="filter-group">
@@ -143,64 +140,94 @@
                 <input type="text" id="titleInput" list="titleList" placeholder="Pesquise ou selecione...">
                 <datalist id="titleList"></datalist>
             </div>
-            <div class="filter-group">
-                <label for="instFilter">Instituição</label>
-                <select id="instFilter"><option value="todas">Todas as Instituições</option></select>
-            </div>
-            <button class="btn-clear" onclick="clearFilters()">Limpar Filtros</button>
+            
+            <button class="btn-clear" onclick="clearFilters()">Limpar Pesquisas</button>
         </aside>
 
+        <!-- ÁREA CENTRAL: GRAFO -->
         <section id="cy-container">
-            <div id="loading">A calcular a física da rede. Por favor aguarde...</div>
+            <div id="loading">A calcular a física e carregar a rede...</div>
             
-            <!-- Painel de Legenda Flutuante -->
             <div id="legend-container">
+                <div class="legend-info-box">
+                    <div style="display:flex; align-items:center; margin-bottom:6px;">
+                        <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:#888; margin-right:8px;"></span> 
+                        <b>Nó:</b> Autor da Publicação
+                    </div>
+                    <div style="display:flex; align-items:center;">
+                        <span style="display:inline-block; width:16px; height:3px; background:#888; margin-right:6px;"></span> 
+                        <b>Aresta:</b> Coautoria em Trabalhos
+                    </div>
+                </div>
                 <h4 id="legend-title">Legenda</h4>
                 <div id="legend-content"></div>
             </div>
 
-            <!-- Botões de Zoom -->
             <div id="zoom-controls">
                 <button class="zoom-btn" id="btn-zoom-in" title="Aproximar">+</button>
                 <button class="zoom-btn" id="btn-zoom-out" title="Afastar">-</button>
-                <button class="zoom-btn" id="btn-zoom-fit" title="Enquadrar Rede">⛶</button>
+                <button class="zoom-btn" id="btn-zoom-fit" title="Enquadrar Rede Inteira">⛶</button>
             </div>
 
             <div id="cy"></div>
         </section>
 
+        <!-- PAINEL DIREITO: DETALHES E PUBLICAÇÕES -->
         <aside class="card" id="sidebar-right">
-            <h3>Detalhes</h3>
+            <h3>Detalhes do Elemento</h3>
             <div id="info-panel">
-                <p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar detalhes.</p>
+                <p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar o perfil e a lista de publicações.</p>
             </div>
         </aside>
     </main>
 
     <script>
         let cy;
-        const yearSlider = document.getElementById('yearSlider');
-        const yearDisplay = document.getElementById('yearDisplay');
         
-        yearSlider.addEventListener('input', function() {
-            if(this.value < this.min) yearDisplay.textContent = 'Todos';
-            else yearDisplay.textContent = this.value;
+        // ----------------------------------------------------
+        // LÓGICA DO MENU LATERAL ESQUERDO
+        // ----------------------------------------------------
+        document.getElementById('toggle-sidebar').addEventListener('click', function() {
+            document.getElementById('sidebar-left').classList.toggle('closed');
+        });
+
+        // ----------------------------------------------------
+        // SLIDER DE ANOS DUPLO (noUiSlider)
+        // ----------------------------------------------------
+        const slider = document.getElementById('yearSlider');
+        const yearDisplay = document.getElementById('yearDisplay');
+
+        noUiSlider.create(slider, {
+            start: [2017, 2026],
+            connect: true,
+            step: 1,
+            range: { 'min': 2017, 'max': 2026 },
+            pips: { mode: 'steps', density: 10, format: { to: Math.round } },
+            format: { to: Math.round, from: Number }
+        });
+
+        slider.noUiSlider.on('change', function (values) {
+            if (values[0] === values[1]) {
+                yearDisplay.textContent = values[0];
+            } else {
+                yearDisplay.textContent = `${values[0]} - ${values[1]}`;
+            }
             applyFilters();
         });
 
-        // Paleta de cores ampla
+        // ----------------------------------------------------
+        // GESTÃO DE CORES
+        // ----------------------------------------------------
         const palette = [
             '#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999',
             '#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#bc80bd',
             '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#17becf'
         ];
 
-        // Atualiza Cores dos Nós E a Legenda na tela
         function updateNodeColors(attribute, elementsArray = null) {
             const colorMap = {};
             let cIndex = 0;
             
-            // Geração das cores
             let nodesArray = cy ? cy.nodes() : (elementsArray.nodes ? elementsArray.nodes : elementsArray.filter(e => !e.data.source));
             
             nodesArray.forEach(node => {
@@ -211,40 +238,42 @@
                     colorMap[val] = palette[cIndex % palette.length];
                     cIndex++;
                 }
-                
-                if (cy) {
-                    node.data('node_color', colorMap[val]);
-                } else {
-                    node.data.node_color = colorMap[val];
-                }
+                if (cy) node.data('node_color', colorMap[val]);
+                else node.data.node_color = colorMap[val];
             });
 
-            // Atualização do HTML da Legenda
-            const legendTitle = document.getElementById('colorAttribute').options[document.getElementById('colorAttribute').selectedIndex].text;
-            document.getElementById('legend-title').textContent = `Legenda: ${legendTitle}`;
+            // Obter rótulo do radio button selecionado
+            const checkedRadio = document.querySelector('input[name="colorAttr"]:checked');
+            document.getElementById('legend-title').textContent = `Cores: ${checkedRadio.parentNode.textContent.trim()}`;
             
             let legendHtml = '';
-            // Ordenar categorias alfabeticamente
             Object.keys(colorMap).sort().forEach(key => {
                 legendHtml += `
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: ${colorMap[key]}"></div>
                         <span>${key}</span>
-                    </div>
-                `;
+                    </div>`;
             });
             document.getElementById('legend-content').innerHTML = legendHtml;
         }
 
-        document.getElementById('colorAttribute').addEventListener('change', function(e) {
-            updateNodeColors(e.target.value);
+        document.querySelectorAll('input[name="colorAttr"]').forEach(radio => {
+            radio.addEventListener('change', function(e) {
+                updateNodeColors(e.target.value);
+            });
         });
 
+        // Variável Global para rastrear a seleção ativa para o painel direito
+        window.currentSelection = null;
+
+        // ----------------------------------------------------
+        // INICIALIZAÇÃO DA REDE E DADOS
+        // ----------------------------------------------------
         fetch('rede_coautoria_2017_2026.json')
             .then(response => response.json())
             .then(data => {
                 
-                const defaultColorAttribute = document.getElementById('colorAttribute').value;
+                const defaultColorAttribute = document.querySelector('input[name="colorAttr"]:checked').value;
                 updateNodeColors(defaultColorAttribute, data);
 
                 cy = cytoscape({
@@ -255,32 +284,28 @@
                             selector: 'node',
                             style: {
                                 'background-color': 'data(node_color)',
-                                
-                                // NÓS MAIORES: Aumentado o valor mínimo para 15px e o multiplicador
-                                'width': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 5000); },
-                                'height': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 5000); },
-                                
-                                // RÓTULOS OCULTOS NO ZOOM OUT
+                                // Nós maiores destacados pela centralidade (Mínimo de 15px)
+                                'width': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 8000); },
+                                'height': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 8000); },
                                 'label': 'data(label)',
                                 'font-size': '14px',
-                                // min-zoomed-font-size esconde o texto se a câmara estiver muito afastada
-                                'min-zoomed-font-size': 6,
-                                
                                 'color': '#222',
+                                // Rótulos desaparecem quando é feito o zoom out (ajuste este valor se necessário)
+                                'min-zoomed-font-size': 6,
                                 'text-valign': 'center',
                                 'text-halign': 'right',
                                 'text-margin-x': 6,
                                 'border-width': 1,
-                                'border-color': '#ffffff'
+                                'border-color': '#fff'
                             }
                         },
                         {
                             selector: 'edge',
                             style: {
-                                // ARESTAS MAIS VISÍVEIS
-                                'width': function(ele) { return Math.max(1, (ele.data('weight') || 1) * 0.8); },
-                                'line-color': '#aaaaaa', // Cor mais escura
-                                'opacity': 0.5,
+                                // Arestas visíveis e ligeiramente mais grossas se tiverem mais peso
+                                'width': function(ele) { return Math.max(1, (ele.data('weight') || 1) * 1.2); },
+                                'line-color': '#888888',
+                                'opacity': 0.6,
                                 'curve-style': 'haystack'
                             }
                         },
@@ -289,11 +314,11 @@
                             style: {
                                 'background-color': '#FF5722',
                                 'border-color': '#000',
-                                'border-width': 2,
+                                'border-width': 3,
                                 'z-index': 999,
                                 'opacity': 1,
-                                'font-size': '18px',
-                                'min-zoomed-font-size': 0 // Rótulo forçado a aparecer quando filtrado
+                                'font-size': '20px',
+                                'min-zoomed-font-size': 0 // O nome aparece sempre se o autor for pesquisado
                             }
                         },
                         {
@@ -302,9 +327,16 @@
                         }
                     ],
                     layout: {
-                        name: 'preset',
+                        name: 'fcose',
+                        quality: 'draft',
+                        randomize: true,
+                        animate: true,
+                        animationDuration: 2500,
                         fit: true,
-                        padding: 30
+                        nodeRepulsion: 15000,
+                        idealEdgeLength: 50,
+                        gravity: 0.1,
+                        numIter: 1000
                     }
                 });
 
@@ -313,89 +345,137 @@
                     populateUILists(cy);
                 });
 
-                // Lógica dos Botões de Zoom
-                document.getElementById('btn-zoom-in').addEventListener('click', () => { cy.zoom(cy.zoom() * 1.3); });
-                document.getElementById('btn-zoom-out').addEventListener('click', () => { cy.zoom(cy.zoom() * 0.7); });
-                document.getElementById('btn-zoom-fit').addEventListener('click', () => { cy.fit(cy.elements(), 30); });
+                // Lógica dos Botões de Navegação (Zoom)
+                document.getElementById('btn-zoom-in').addEventListener('click', () => cy.zoom(cy.zoom() * 1.3));
+                document.getElementById('btn-zoom-out').addEventListener('click', () => cy.zoom(cy.zoom() * 0.7));
+                document.getElementById('btn-zoom-fit').addEventListener('click', () => cy.fit(cy.elements(), 30));
 
                 document.getElementById('authorInput').addEventListener('input', applyFilters);
                 document.getElementById('titleInput').addEventListener('input', applyFilters);
-                document.getElementById('instFilter').addEventListener('change', applyFilters);
 
-                const infoPanel = document.getElementById('info-panel');
-                cy.on('tap', 'node', function(evt){
-                    const d = evt.target.data();
-                    const colorAttr = document.getElementById('colorAttribute').value;
-                    const colorCategoryValue = d[colorAttr] || 'Desconhecido';
-
-                    infoPanel.innerHTML = `
-                        <div class="detail-item"><span class="detail-label">Autor</span><span class="detail-value" style="font-size:1.1em; font-weight:bold; color:var(--mb-dark-green);">${d.label}</span></div>
-                        <div class="detail-item"><span class="detail-label">Instituição</span><span class="detail-value">${d.institution || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Centralidade (Grau)</span><span class="detail-value">${(d.degree_centrality || 0).toFixed(4)}</span></div>
-                        <hr style="border:0; border-top:1px dashed #ccc; margin:15px 0;">
-                        <div class="detail-item">
-                            <span class="detail-label">Cor atual representa (${colorAttr}):</span>
-                            <div style="margin-top: 5px; display: flex; align-items: center;">
-                                <span class="legend-color" style="background-color: ${d.node_color}; display: inline-block;"></span>
-                                <b>${colorCategoryValue}</b>
-                            </div>
-                        </div>
-                        <div class="detail-item"><span class="detail-label">Domínio:</span><span class="detail-value">${d.domain || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Campo:</span><span class="detail-value">${d.field || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Subcampo:</span><span class="detail-value">${d.subfield || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Tópico:</span><span class="detail-value">${d.topic || 'N/A'}</span></div>
-                    `;
-                });
-
-                cy.on('tap', 'edge', function(evt){
-                    const d = evt.target.data();
-                    const source = cy.getElementById(d.source).data('label');
-                    const target = cy.getElementById(d.target).data('label');
-                    
-                    const titlesHtml = d.titles ? d.titles.split('|').map(t => `<div class="tag">${t.trim()}</div>`).join('') : 'N/A';
-                    const yearsHtml = d.years ? d.years.split('|').map(y => `<span class="tag" style="background:#d4edda; color:#155724;">${y.trim()}</span>`).join('') : 'N/A';
-
-                    infoPanel.innerHTML = `
-                        <div class="detail-item"><span class="detail-label">Coautoria Entre</span><span class="detail-value"><b>${source}</b> <br>&amp;<br> <b>${target}</b></span></div>
-                        <div class="detail-item"><span class="detail-label">Total de Artigos Juntos</span><span class="detail-value">${d.weight || 1}</span></div>
-                        <div class="detail-item"><span class="detail-label">Anos das Publicações</span><div style="margin-top:5px;">${yearsHtml}</div></div>
-                        <div class="detail-item"><span class="detail-label">Títulos dos Artigos</span><div style="margin-top:5px;">${titlesHtml}</div></div>
-                    `;
-                });
-
+                // Clique num elemento da rede
                 cy.on('tap', function(evt){
                     if(evt.target === cy){
                         cy.elements().removeClass('faded highlighted');
-                        infoPanel.innerHTML = `<p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar detalhes.</p>`;
+                        document.getElementById('info-panel').innerHTML = `<p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar o perfil e a lista de publicações.</p>`;
+                        window.currentSelection = null;
+                        
+                        // Retorna o zoom ao normal
+                        cy.animate({ fit: { padding: 30 } }, { duration: 600 });
+                    } else {
+                        window.currentSelection = { ele: evt.target, isNode: evt.target.isNode() };
+                        renderRightPanel(evt.target, evt.target.isNode(), 'all');
                     }
                 });
 
             })
             .catch(err => {
-                document.getElementById('loading').innerHTML = 'Erro ao carregar o JSON. Verifique o console.';
+                document.getElementById('loading').innerHTML = 'Erro ao carregar o JSON.';
                 console.error(err);
             });
 
-        function populateUILists(cyInstance) {
-            const authors = new Set(), institutions = new Set(), titles = new Set();
-            let minYear = 9999, maxYear = 0;
+        // ----------------------------------------------------
+        // RENDERIZAÇÃO DO PAINEL DIREITO (PUBLICAÇÕES E FILTRO LOCAL)
+        // ----------------------------------------------------
+        window.updateRightPanelFilter = function(yearVal) {
+            if(window.currentSelection) {
+                renderRightPanel(window.currentSelection.ele, window.currentSelection.isNode, yearVal);
+            }
+        };
 
+        function renderRightPanel(element, isNode, yearFilter = 'all') {
+            const infoPanel = document.getElementById('info-panel');
+            const d = element.data();
+            let html = '';
+            
+            // CABEÇALHO DO PERFIL
+            if(isNode) {
+                const colorAttr = document.querySelector('input[name="colorAttr"]:checked').value;
+                const colorCategoryValue = d[colorAttr] || 'Desconhecido';
+
+                html += `<div class="detail-item"><span class="detail-label">Autor Principal</span><span class="detail-value" style="font-size:1.1em; font-weight:bold; color:var(--mb-dark-green);">${d.label}</span></div>`;
+                html += `<div class="detail-item"><span class="detail-label">Instituição Registada</span><span class="detail-value">${d.institution || 'N/A'}</span></div>`;
+                html += `<div class="detail-item"><span class="detail-label">Relevância na Rede (Centralidade)</span><span class="detail-value">${(d.degree_centrality || 0).toFixed(4)}</span></div>`;
+                html += `<div class="detail-item">
+                            <span class="detail-label">Área Atribuída (${colorAttr})</span>
+                            <div style="margin-top: 3px; display: flex; align-items: center;">
+                                <span class="legend-color" style="background-color: ${d.node_color};"></span>
+                                <b>${colorCategoryValue}</b>
+                            </div>
+                         </div>`;
+            } else {
+                const source = cy.getElementById(d.source).data('label');
+                const target = cy.getElementById(d.target).data('label');
+                html += `<div class="detail-item"><span class="detail-label">Conexão de Coautoria</span><span class="detail-value"><b>${source}</b> <br><span style="color:#888;">&amp;</span><br> <b>${target}</b></span></div>`;
+            }
+
+            // EXTRAÇÃO DAS PUBLICAÇÕES
+            let edges = isNode ? element.connectedEdges() : cy.collection([element]);
+            let availableYears = new Set();
+            let pubs = new Set();
+
+            edges.forEach(e => {
+                let yStr = e.data('years');
+                let tStr = e.data('titles');
+                
+                if(yStr && tStr) {
+                    let yArr = yStr.split('|').map(y => parseInt(y.trim()));
+                    yArr.forEach(y => availableYears.add(y));
+                    
+                    if(yearFilter === 'all' || yArr.includes(parseInt(yearFilter))) {
+                        tStr.split('|').forEach(t => {
+                            if(t.trim()) {
+                                pubs.add(`<li>${t.trim()} <br><span class="pub-year">Publicado em: ${yArr.join(', ')}</span></li>`);
+                            }
+                        });
+                    }
+                }
+            });
+
+            // FILTRO DE ANOS (ESPECÍFICO DO AUTOR/CONEXÃO)
+            html += `<hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">`;
+            html += `<div class="detail-item">
+                        <span class="detail-label">Filtrar Publicações Deste Autor Por Ano:</span>
+                        <select id="localYearFilter" onchange="updateRightPanelFilter(this.value)" style="width:100%; padding:6px; border-radius:4px; border:1px solid #ccc;">
+                            <option value="all">Ver Todos os Anos</option>`;
+            
+            Array.from(availableYears).sort().forEach(y => {
+                if(!isNaN(y)) {
+                    let sel = (y.toString() === yearFilter) ? 'selected' : '';
+                    html += `<option value="${y}" ${sel}>${y}</option>`;
+                }
+            });
+            
+            html += `   </select>
+                     </div>`;
+                     
+            // LISTA DE ARTIGOS
+            html += `<div class="detail-item">
+                        <span class="detail-label">Trabalhos Encontrados (${pubs.size}):</span>
+                        <ul class="pub-list">`;
+            if(pubs.size > 0) {
+                html += Array.from(pubs).join('');
+            } else {
+                html += `<li>Nenhuma publicação encontrada para o ano selecionado.</li>`;
+            }
+            html += `</ul></div>`;
+
+            infoPanel.innerHTML = html;
+        }
+
+        // ----------------------------------------------------
+        // LÓGICA GERAL DE PESQUISA E FILTROS DO PAINEL ESQUERDO
+        // ----------------------------------------------------
+        function populateUILists(cyInstance) {
+            const authors = new Set(), titles = new Set();
+            
             cyInstance.nodes().forEach(node => {
                 const label = node.data('label');
-                const inst = node.data('institution');
                 if(label) authors.add(label);
-                if(inst && inst !== 'Instituição Não Informada') institutions.add(inst);
             });
 
             cyInstance.edges().forEach(edge => {
                 if(edge.data('titles')) edge.data('titles').split('|').forEach(t => { if(t.trim()) titles.add(t.trim()); });
-                if(edge.data('years')) edge.data('years').split('|').forEach(y => {
-                    const yearInt = parseInt(y.trim());
-                    if(!isNaN(yearInt)) {
-                        if(yearInt < minYear) minYear = yearInt;
-                        if(yearInt > maxYear) maxYear = yearInt;
-                    }
-                });
             });
 
             const authorList = document.getElementById('authorList');
@@ -403,20 +483,12 @@
 
             const titleList = document.getElementById('titleList');
             Array.from(titles).sort().forEach(t => titleList.insertAdjacentHTML('beforeend', `<option value="${t}">`));
-
-            const instSelect = document.getElementById('instFilter');
-            Array.from(institutions).sort().forEach(i => instSelect.insertAdjacentHTML('beforeend', `<option value="${i}">${i}</option>`));
-
-            if(minYear <= maxYear) {
-                yearSlider.min = minYear - 1; yearSlider.max = maxYear; yearSlider.value = minYear - 1; yearDisplay.textContent = 'Todos';
-            }
         }
 
         function clearFilters() {
             document.getElementById('authorInput').value = '';
             document.getElementById('titleInput').value = '';
-            document.getElementById('instFilter').value = 'todas';
-            yearSlider.value = yearSlider.min; yearDisplay.textContent = 'Todos';
+            slider.noUiSlider.set([2017, 2026]);
             applyFilters();
         }
 
@@ -424,23 +496,39 @@
             if(!cy) return;
             const searchAuthor = document.getElementById('authorInput').value.toLowerCase();
             const searchTitle = document.getElementById('titleInput').value.toLowerCase();
-            const selectedInst = document.getElementById('instFilter').value;
-            const selectedYear = yearSlider.value > yearSlider.min ? yearSlider.value : 'todos';
+            
+            const years = slider.noUiSlider.get();
+            const startYear = parseInt(years[0]);
+            const endYear = parseInt(years[1]);
 
             cy.elements().removeClass('faded highlighted');
 
-            if (searchAuthor === '' && searchTitle === '' && selectedInst === 'todas' && selectedYear === 'todos') return;
+            if (searchAuthor === '' && searchTitle === '' && startYear === 2017 && endYear === 2026) {
+                cy.animate({ fit: { padding: 30 } }, { duration: 600 });
+                return;
+            }
 
-            let nodesToKeep = cy.collection(), edgesToKeep = cy.collection();
+            let nodesToKeep = cy.collection();
+            let edgesToKeep = cy.collection();
 
             cy.elements().forEach(ele => {
                 if (ele.isNode()) {
-                    let matchInst = selectedInst === 'todas' || ele.data('institution') === selectedInst;
                     let matchAuthor = searchAuthor === '' || (ele.data('label') && ele.data('label').toLowerCase().includes(searchAuthor));
-                    if (matchInst && matchAuthor && searchTitle === '' && selectedYear === 'todos') nodesToKeep = nodesToKeep.union(ele);
+                    if (matchAuthor && searchTitle === '' && startYear === 2017 && endYear === 2026) {
+                        nodesToKeep = nodesToKeep.union(ele);
+                    }
                 } else if (ele.isEdge()) {
                     let matchTitle = searchTitle === '' || (ele.data('titles') && ele.data('titles').toLowerCase().includes(searchTitle));
-                    let matchYear = selectedYear === 'todos' || (ele.data('years') && ele.data('years').includes(selectedYear.toString()));
+                    
+                    let matchYear = false;
+                    if (startYear === 2017 && endYear === 2026) {
+                        matchYear = true;
+                    } else if (ele.data('years')) {
+                        let yArr = ele.data('years').split('|').map(y=>parseInt(y.trim()));
+                        // Verifica se algum dos anos do artigo está dentro do intervalo selecionado
+                        matchYear = yArr.some(y => y >= startYear && y <= endYear);
+                    }
+
                     if(matchTitle && matchYear) {
                         edgesToKeep = edgesToKeep.union(ele);
                         nodesToKeep = nodesToKeep.union(ele.connectedNodes());
@@ -448,21 +536,33 @@
                 }
             });
 
-            if (searchAuthor !== '' || selectedInst !== 'todas') {
-                nodesToKeep = cy.nodes().filter(n => {
-                    return (selectedInst === 'todas' || n.data('institution') === selectedInst) && 
-                           (searchAuthor === '' || (n.data('label') && n.data('label').toLowerCase().includes(searchAuthor)));
-                });
+            // Se for procurar o autor e o ano/título ao mesmo tempo (interseção)
+            if (searchAuthor !== '') {
+                nodesToKeep = cy.nodes().filter(n => n.data('label') && n.data('label').toLowerCase().includes(searchAuthor));
                 edgesToKeep = nodesToKeep.connectedEdges().filter(e => {
-                    return (searchTitle === '' || (e.data('titles') && e.data('titles').toLowerCase().includes(searchTitle))) &&
-                           (selectedYear === 'todos' || (e.data('years') && e.data('years').includes(selectedYear.toString())));
+                    let matchTitle = searchTitle === '' || (e.data('titles') && e.data('titles').toLowerCase().includes(searchTitle));
+                    let matchYear = (startYear === 2017 && endYear === 2026);
+                    if (!matchYear && e.data('years')) {
+                        let yArr = e.data('years').split('|').map(y=>parseInt(y.trim()));
+                        matchYear = yArr.some(y => y >= startYear && y <= endYear);
+                    }
+                    return matchTitle && matchYear;
                 });
-                if(searchTitle !== '' || selectedYear !== 'todos') nodesToKeep = edgesToKeep.connectedNodes().intersection(nodesToKeep);
+                if(searchTitle !== '' || startYear !== 2017 || endYear !== 2026) {
+                    nodesToKeep = edgesToKeep.connectedNodes().intersection(nodesToKeep);
+                }
             }
 
             const elementsToKeep = nodesToKeep.union(edgesToKeep);
             cy.elements().difference(elementsToKeep).addClass('faded');
-            elementsToKeep.addClass('highlighted');
+            elementsToKeep.removeClass('faded').addClass('highlighted');
+
+            // Focar a câmara dinamicamente no autor ou artigo procurado
+            if (searchAuthor !== '' || searchTitle !== '') {
+                if(elementsToKeep.length > 0) {
+                    cy.animate({ fit: { eles: elementsToKeep, padding: 60 } }, { duration: 800 });
+                }
+            }
         }
     </script>
 </body>
