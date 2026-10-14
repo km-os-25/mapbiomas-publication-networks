@@ -4,179 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MapBiomas - Publication Networks</title>
+    
+    <!-- Biblioteca Principal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    
+    <!-- Bibliotecas de Layout fCoSE (Para física ultra-rápida em redes gigantes) -->
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+
     <style>
-        /* Paleta de Cores baseada na imagem MapBiomas */
         :root {
             --mb-green: #4CAF50;
             --mb-dark-green: #2E7D32;
             --mb-gray-bg: #f4f6f8;
             --mb-card-border: #e0e0e0;
             --mb-text-main: #333;
-            --mb-text-muted: #666;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            background-color: var(--mb-gray-bg);
-            color: var(--mb-text-main);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: var(--mb-gray-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-        /* CABEÇALHO SUPERIOR */
-        header {
-            background-color: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--mb-card-border);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            z-index: 10;
-        }
+        header { background-color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--mb-card-border); z-index: 10; }
+        .logo { font-weight: bold; font-size: 1.4em; color: var(--mb-dark-green); letter-spacing: 1px; }
+        .header-title { font-size: 1.2em; border-left: 2px solid #ccc; padding-left: 15px; color: var(--mb-text-main); }
+        
+        .year-control { display: flex; flex-direction: column; align-items: flex-end; min-width: 200px; }
+        .year-control label { font-size: 0.85em; color: #666; margin-bottom: 5px; }
+        .year-slider-container { display: flex; align-items: center; gap: 10px; width: 100%; }
+        input[type=range] { flex-grow: 1; accent-color: var(--mb-green); }
+        #yearDisplay { font-weight: bold; color: var(--mb-dark-green); min-width: 40px; text-align: right; }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+        main { display: flex; flex-grow: 1; padding: 20px; gap: 20px; overflow: hidden; }
 
-        .logo {
-            font-weight: bold;
-            font-size: 1.4em;
-            color: var(--mb-dark-green);
-            letter-spacing: 1px;
-        }
-
-        .header-title {
-            font-size: 1.2em;
-            border-left: 2px solid #ccc;
-            padding-left: 15px;
-            color: var(--mb-text-main);
-        }
-
-        /* SLIDER DE ANOS (Cabeçalho Direito) */
-        .year-control {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            min-width: 200px;
-        }
-        .year-control label {
-            font-size: 0.85em;
-            color: var(--mb-text-muted);
-            margin-bottom: 5px;
-        }
-        .year-slider-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-        }
-        input[type=range] {
-            flex-grow: 1;
-            accent-color: var(--mb-green); /* Cor verde no slider */
-        }
-        #yearDisplay {
-            font-weight: bold;
-            color: var(--mb-dark-green);
-            min-width: 40px;
-            text-align: right;
-        }
-
-        /* ÁREA PRINCIPAL */
-        main {
-            display: flex;
-            flex-grow: 1;
-            padding: 20px;
-            gap: 20px;
-            overflow: hidden;
-        }
-
-        /* PAINÉIS LATERAIS (Cards) */
-        .card {
-            background: white;
-            border: 1px solid var(--mb-card-border);
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-            display: flex;
-            flex-direction: column;
-        }
-
+        .card { background: white; border: 1px solid var(--mb-card-border); border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
         #sidebar-left { width: 300px; overflow-y: auto; }
         #sidebar-right { width: 300px; overflow-y: auto; }
-        
-        .card h3 {
-            margin-top: 0;
-            font-size: 1.1em;
-            color: var(--mb-text-main);
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
+        .card h3 { margin-top: 0; font-size: 1.1em; color: var(--mb-text-main); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px; }
 
-        /* GRUPO DE FILTROS */
         .filter-group { margin-bottom: 20px; }
-        .filter-group label {
-            display: block;
-            font-size: 0.85em;
-            font-weight: 600;
-            color: var(--mb-text-muted);
-            margin-bottom: 6px;
-        }
-        .filter-group input, .filter-group select {
-            width: 100%;
-            padding: 8px 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 0.9em;
-        }
-        .filter-group input:focus, .filter-group select:focus {
-            outline: none;
-            border-color: var(--mb-green);
-        }
-        .btn-clear {
-            background-color: #eee;
-            border: none;
-            padding: 8px;
-            width: 100%;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 10px;
-            font-weight: bold;
-            color: #555;
-        }
+        .filter-group label { display: block; font-size: 0.85em; font-weight: 600; color: #666; margin-bottom: 6px; }
+        .filter-group input, .filter-group select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-clear { background-color: #eee; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; color: #555; }
         .btn-clear:hover { background-color: #ddd; }
 
-        /* CONTÊINER DO GRAFO */
-        #cy-container {
-            flex-grow: 1;
-            background: white;
-            border: 1px solid var(--mb-card-border);
-            border-radius: 8px;
-            position: relative;
-            overflow: hidden;
-        }
+        /* Fundo branco e limpo */
+        #cy-container { flex-grow: 1; background: #ffffff; border: 1px solid var(--mb-card-border); border-radius: 8px; position: relative; overflow: hidden; }
         #cy { width: 100%; height: 100%; }
-        
-        #loading {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.2em; color: var(--mb-text-muted);
-        }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; color: #666; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
 
-        /* ESTILOS DE DETALHES (Painel Direito) */
         .detail-item { margin-bottom: 12px; font-size: 0.9em; }
-        .detail-label { font-weight: 600; color: var(--mb-text-muted); display: block; font-size: 0.85em;}
+        .detail-label { font-weight: 600; color: #666; display: block; font-size: 0.85em;}
         .detail-value { color: var(--mb-text-main); word-wrap: break-word;}
         .tag { background: #e9ecef; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px 2px 2px 0; display: inline-block;}
+        .color-legend { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
     </style>
 </head>
 <body>
@@ -186,11 +66,9 @@
             <div class="logo">MAPBIOMAS</div>
             <div class="header-title">Scientific publications: network overview</div>
         </div>
-        
         <div class="year-control">
             <label for="yearSlider">Ano da Publicação</label>
             <div class="year-slider-container">
-                <!-- Slider com min/max definidos via JS -->
                 <input type="range" id="yearSlider" min="2017" max="2026" step="1" value="0">
                 <span id="yearDisplay">Todos</span>
             </div>
@@ -198,210 +76,112 @@
     </header>
 
     <main>
-        <!-- Painel de Filtros -->
         <aside class="card" id="sidebar-left">
-            <h3>Filtros</h3>
+            <h3>Filtros & Aparência</h3>
+            
+            <!-- NOVO: Dropdown para colorir os nós -->
+            <div class="filter-group">
+                <label for="colorAttribute">Colorir Nós Por:</label>
+                <select id="colorAttribute">
+                    <option value="domain" selected>Domínio (Domain)</option>
+                    <option value="field">Campo (Field)</option>
+                    <option value="subfield">Subcampo (Subfield)</option>
+                    <option value="topic">Tópico (Topic)</option>
+                </select>
+            </div>
 
             <div class="filter-group">
                 <label for="authorInput">Nome do Autor</label>
-                <!-- O list="authorList" conecta o input ao datalist (Permite lista + pesquisa) -->
                 <input type="text" id="authorInput" list="authorList" placeholder="Pesquise ou selecione...">
                 <datalist id="authorList"></datalist>
             </div>
-
             <div class="filter-group">
                 <label for="titleInput">Título da Publicação</label>
                 <input type="text" id="titleInput" list="titleList" placeholder="Pesquise ou selecione...">
                 <datalist id="titleList"></datalist>
             </div>
-
             <div class="filter-group">
                 <label for="instFilter">Instituição</label>
-                <select id="instFilter">
-                    <option value="todas">Todas as Instituições</option>
-                </select>
+                <select id="instFilter"><option value="todas">Todas as Instituições</option></select>
             </div>
-
             <button class="btn-clear" onclick="clearFilters()">Limpar Filtros</button>
         </aside>
 
-        <!-- Grafo -->
         <section id="cy-container">
-            <div id="loading">A carregar a rede de dados...</div>
+            <div id="loading">A calcular a física da rede. Por favor aguarde...</div>
             <div id="cy"></div>
         </section>
 
-        <!-- Painel de Detalhes -->
         <aside class="card" id="sidebar-right">
             <h3>Detalhes</h3>
             <div id="info-panel">
-                <p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar as métricas e detalhes aqui.</p>
+                <p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar detalhes.</p>
             </div>
         </aside>
     </main>
 
     <script>
         let cy;
-
-        // Atualiza a visualização do Slider
         const yearSlider = document.getElementById('yearSlider');
         const yearDisplay = document.getElementById('yearDisplay');
         
         yearSlider.addEventListener('input', function() {
-            // Se o valor for menor que o ano mínimo (ex: 2016 para dados que começam em 2017), significa "Todos"
-            if(this.value < this.min) {
-                yearDisplay.textContent = 'Todos';
-            } else {
-                yearDisplay.textContent = this.value;
-            }
+            if(this.value < this.min) yearDisplay.textContent = 'Todos';
+            else yearDisplay.textContent = this.value;
             applyFilters();
         });
 
-        function populateUILists(cyInstance) {
-            const authors = new Set();
-            const institutions = new Set();
-            const titles = new Set();
-            let minYear = 9999;
-            let maxYear = 0;
+        // Paleta de cores ampliada para suportar muitos tópicos ou subcampos diferentes
+        const palette = [
+            '#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f',
+            '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+            '#393b79','#5254a3','#6b6ecf','#9c9ede','#637939','#8ca252','#b5cf6b','#cedb9c','#8c6d31','#bd9e39','#e7ba52','#e7cb94',
+            '#843c39','#ad494a','#d6616b','#e7969c','#7b4173','#a55194','#ce6dbd','#de9ed6'
+        ];
 
-            // Extrair dados dos nós
-            cyInstance.nodes().forEach(node => {
-                const label = node.data('label');
-                const inst = node.data('institution');
-                if(label) authors.add(label);
-                if(inst && inst !== 'Instituição Não Informada') institutions.add(inst);
-            });
-
-            // Extrair dados das arestas
-            cyInstance.edges().forEach(edge => {
-                const edgeTitles = edge.data('titles');
-                const edgeYears = edge.data('years');
-                
-                if(edgeTitles) {
-                    edgeTitles.split('|').forEach(t => {
-                        const cleanTitle = t.trim();
-                        if(cleanTitle) titles.add(cleanTitle);
-                    });
-                }
-                if(edgeYears) {
-                    edgeYears.split('|').forEach(y => {
-                        const yearInt = parseInt(y.trim());
-                        if(!isNaN(yearInt)) {
-                            if(yearInt < minYear) minYear = yearInt;
-                            if(yearInt > maxYear) maxYear = yearInt;
+        // Função para colorir os nós consoante um atributo específico (domain, field, etc.)
+        function updateNodeColors(attribute, elementsArray = null) {
+            const colorMap = {};
+            let cIndex = 0;
+            
+            if (cy) {
+                // Se a rede já foi carregada, atualizamos na hora de forma rápida usando "batch"
+                cy.batch(() => {
+                    cy.nodes().forEach(node => {
+                        let val = node.data(attribute) || 'Desconhecido';
+                        if (!colorMap[val]) {
+                            colorMap[val] = palette[cIndex % palette.length];
+                            cIndex++;
                         }
+                        node.data('node_color', colorMap[val]); // Altera a cor dinamicamente
                     });
-                }
-            });
-
-            // Preencher Datalist de Autores
-            const authorList = document.getElementById('authorList');
-            Array.from(authors).sort().forEach(a => {
-                authorList.insertAdjacentHTML('beforeend', `<option value="${a}">`);
-            });
-
-            // Preencher Datalist de Títulos
-            const titleList = document.getElementById('titleList');
-            Array.from(titles).sort().forEach(t => {
-                titleList.insertAdjacentHTML('beforeend', `<option value="${t}">`);
-            });
-
-            // Preencher Select de Instituições
-            const instSelect = document.getElementById('instFilter');
-            Array.from(institutions).sort().forEach(i => {
-                instSelect.insertAdjacentHTML('beforeend', `<option value="${i}">${i}</option>`);
-            });
-
-            // Configurar Slider de Anos
-            if(minYear <= maxYear) {
-                yearSlider.min = minYear;
-                yearSlider.max = maxYear;
-                // Truque: adicionar uma opção "Todos" abaixo do valor mínimo
-                yearSlider.min = minYear - 1; 
-                yearSlider.value = minYear - 1;
-                yearDisplay.textContent = 'Todos';
-            }
-        }
-
-        function clearFilters() {
-            document.getElementById('authorInput').value = '';
-            document.getElementById('titleInput').value = '';
-            document.getElementById('instFilter').value = 'todas';
-            yearSlider.value = yearSlider.min;
-            yearDisplay.textContent = 'Todos';
-            applyFilters();
-        }
-
-        function applyFilters() {
-            if(!cy) return;
-
-            const searchAuthor = document.getElementById('authorInput').value.toLowerCase();
-            const searchTitle = document.getElementById('titleInput').value.toLowerCase();
-            const selectedInst = document.getElementById('instFilter').value;
-            const selectedYear = yearSlider.value > yearSlider.min ? yearSlider.value : 'todos';
-
-            cy.elements().removeClass('faded highlighted');
-
-            // Se nada estiver filtrado, mostrar tudo
-            if (searchAuthor === '' && searchTitle === '' && selectedInst === 'todas' && selectedYear === 'todos') {
-                return;
-            }
-
-            let nodesToKeep = cy.collection();
-            let edgesToKeep = cy.collection();
-
-            // Filtragem
-            cy.elements().forEach(ele => {
-                if (ele.isNode()) {
-                    let matchInst = selectedInst === 'todas' || ele.data('institution') === selectedInst;
-                    let matchAuthor = searchAuthor === '' || (ele.data('label') && ele.data('label').toLowerCase().includes(searchAuthor));
-                    
-                    // Se apenas os filtros de nó estão ativos e correspondem
-                    if (matchInst && matchAuthor && searchTitle === '' && selectedYear === 'todos') {
-                        nodesToKeep = nodesToKeep.union(ele);
-                    }
-                } else if (ele.isEdge()) {
-                    let matchTitle = searchTitle === '' || (ele.data('titles') && ele.data('titles').toLowerCase().includes(searchTitle));
-                    let matchYear = selectedYear === 'todos' || (ele.data('years') && ele.data('years').includes(selectedYear.toString()));
-                    
-                    // Se a aresta cumpre os critérios, guardamos a aresta e os autores (nós) conectados a ela
-                    if(matchTitle && matchYear) {
-                        edgesToKeep = edgesToKeep.union(ele);
-                        nodesToKeep = nodesToKeep.union(ele.connectedNodes());
-                    }
-                }
-            });
-
-            // Lógica de intersecção se procurarmos um Autor + um Ano específico
-            if (searchAuthor !== '' || selectedInst !== 'todas') {
-                nodesToKeep = cy.nodes().filter(n => {
-                    let matchInst = selectedInst === 'todas' || n.data('institution') === selectedInst;
-                    let matchAuthor = searchAuthor === '' || (n.data('label') && n.data('label').toLowerCase().includes(searchAuthor));
-                    return matchInst && matchAuthor;
                 });
-                // Recuperar as arestas desses autores que cumprem os filtros de artigo
-                edgesToKeep = nodesToKeep.connectedEdges().filter(e => {
-                    let matchTitle = searchTitle === '' || (e.data('titles') && e.data('titles').toLowerCase().includes(searchTitle));
-                    let matchYear = selectedYear === 'todos' || (e.data('years') && e.data('years').includes(selectedYear.toString()));
-                    return matchTitle && matchYear;
+            } else if (elementsArray) {
+                // Executado apenas na primeira vez antes de iniciar o Cytoscape
+                let nodesArray = elementsArray.nodes ? elementsArray.nodes : elementsArray.filter(e => !e.data.source);
+                nodesArray.forEach(node => {
+                    let val = node.data[attribute] || 'Desconhecido';
+                    if (!colorMap[val]) {
+                        colorMap[val] = palette[cIndex % palette.length];
+                        cIndex++;
+                    }
+                    node.data.node_color = colorMap[val];
                 });
-                
-                // Os nós visíveis finais serão apenas os que estão nestas arestas filtradas (se existirem filtros de aresta)
-                if(searchTitle !== '' || selectedYear !== 'todos') {
-                    nodesToKeep = edgesToKeep.connectedNodes().intersection(nodesToKeep);
-                }
             }
-
-            const elementsToKeep = nodesToKeep.union(edgesToKeep);
-            cy.elements().difference(elementsToKeep).addClass('faded');
-            elementsToKeep.addClass('highlighted');
         }
 
-        // CARREGAR DADOS JSON (Substitua o nome se necessário)
+        // Listener do menu suspenso de Cores
+        document.getElementById('colorAttribute').addEventListener('change', function(e) {
+            updateNodeColors(e.target.value);
+        });
+
         fetch('rede_coautoria_2017_2026.json')
             .then(response => response.json())
             .then(data => {
-                document.getElementById('loading').style.display = 'none';
+                
+                // Antes de carregar o gráfico, colore os nós usando o valor selecionado por defeito (domain)
+                const defaultColorAttribute = document.getElementById('colorAttribute').value;
+                updateNodeColors(defaultColorAttribute, data);
 
                 cy = cytoscape({
                     container: document.getElementById('cy'),
@@ -410,34 +190,39 @@
                         {
                             selector: 'node',
                             style: {
-                                'background-color': 'var(--mb-dark-green)',
-                                'label': 'data(label)',
-                                'font-size': '10px',
-                                'color': '#333',
-                                'text-valign': 'bottom',
-                                'text-margin-y': 5,
-                                'width': '12px',
-                                'height': '12px'
+                                'background-color': 'data(node_color)', // A cor que foi processada pelo JS
+                                
+                                'width': function(ele) { return Math.max(5, ele.data('degree_centrality') * 2000); },
+                                'height': function(ele) { return Math.max(5, ele.data('degree_centrality') * 2000); },
+                                
+                                'label': function(ele) { return ele.data('degree_centrality') > 0.005 ? ele.data('label') : ''; },
+                                'font-size': function(ele) { return Math.max(10, ele.data('degree_centrality') * 800); },
+                                
+                                'color': '#000',
+                                'text-valign': 'center',
+                                'text-halign': 'right',
+                                'text-margin-x': 4,
+                                'border-width': 0.5,
+                                'border-color': '#fff'
                             }
                         },
                         {
                             selector: 'edge',
                             style: {
-                                'width': function(ele) { return Math.max(0.5, ele.data('weight') * 0.5); },
-                                'line-color': '#c2cce0',
-                                'curve-style': 'haystack',
-                                'opacity': 0.6
+                                'width': 0.3,
+                                'line-color': '#d3d3d3',
+                                'opacity': 0.5,
+                                'curve-style': 'haystack'
                             }
                         },
                         {
                             selector: '.highlighted',
                             style: {
-                                'background-color': '#FF9800',
-                                'line-color': '#FF9800',
-                                'width': '18px',
-                                'height': '18px',
+                                'background-color': '#FF5722',
                                 'z-index': 999,
-                                'opacity': 1
+                                'opacity': 1,
+                                'label': 'data(label)',
+                                'font-size': '16px'
                             }
                         },
                         {
@@ -446,28 +231,47 @@
                         }
                     ],
                     layout: {
-                        name: 'concentric',
-                        minNodeSpacing: 20
-                        
+                        name: 'fcose',
+                        quality: 'default',
+                        randomize: true,
+                        animate: false,
+                        nodeRepulsion: 45000,
+                        idealEdgeLength: 50,
+                        gravity: 0.05
                     }
                 });
 
-                populateUILists(cy);
+                cy.ready(function() {
+                    document.getElementById('loading').style.display = 'none';
+                    populateUILists(cy);
+                });
 
-                // Event Listeners de Input
                 document.getElementById('authorInput').addEventListener('input', applyFilters);
                 document.getElementById('titleInput').addEventListener('input', applyFilters);
                 document.getElementById('instFilter').addEventListener('change', applyFilters);
 
-                // Interação de Clique para Detalhes
                 const infoPanel = document.getElementById('info-panel');
-
                 cy.on('tap', 'node', function(evt){
                     const d = evt.target.data();
+                    const colorAttr = document.getElementById('colorAttribute').value;
+                    const colorCategoryValue = d[colorAttr] || 'Desconhecido';
+
                     infoPanel.innerHTML = `
                         <div class="detail-item"><span class="detail-label">Autor</span><span class="detail-value" style="font-size:1.1em; font-weight:bold; color:var(--mb-dark-green);">${d.label}</span></div>
                         <div class="detail-item"><span class="detail-label">Instituição</span><span class="detail-value">${d.institution || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Domínio Principal</span><span class="detail-value">${d.domain || 'N/A'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Centralidade (Importância)</span><span class="detail-value">${(d.degree_centrality).toFixed(4)}</span></div>
+                        <hr style="border:0; border-top:1px dashed #ccc; margin:15px 0;">
+                        <div class="detail-item">
+                            <span class="detail-label">Cor atual representa (${colorAttr}):</span>
+                            <div style="margin-top: 5px;">
+                                <span class="color-legend" style="background-color: ${d.node_color}"></span>
+                                <b>${colorCategoryValue}</b>
+                            </div>
+                        </div>
+                        <div class="detail-item"><span class="detail-label">Domínio:</span><span class="detail-value">${d.domain || 'N/A'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Campo:</span><span class="detail-value">${d.field || 'N/A'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Subcampo:</span><span class="detail-value">${d.subfield || 'N/A'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Tópico:</span><span class="detail-value">${d.topic || 'N/A'}</span></div>
                     `;
                 });
 
@@ -476,12 +280,11 @@
                     const source = cy.getElementById(d.source).data('label');
                     const target = cy.getElementById(d.target).data('label');
                     
-                    const titlesHtml = d.titles.split('|').map(t => `<div class="tag">${t.trim()}</div>`).join('');
-                    const yearsHtml = d.years.split('|').map(y => `<span class="tag" style="background:#d4edda; color:#155724;">${y.trim()}</span>`).join('');
+                    const titlesHtml = d.titles ? d.titles.split('|').map(t => `<div class="tag">${t.trim()}</div>`).join('') : 'N/A';
+                    const yearsHtml = d.years ? d.years.split('|').map(y => `<span class="tag" style="background:#d4edda; color:#155724;">${y.trim()}</span>`).join('') : 'N/A';
 
                     infoPanel.innerHTML = `
                         <div class="detail-item"><span class="detail-label">Coautoria Entre</span><span class="detail-value"><b>${source}</b> <br>&amp;<br> <b>${target}</b></span></div>
-                        <div class="detail-item"><span class="detail-label">Total de Artigos Juntos</span><span class="detail-value">${d.weight}</span></div>
                         <div class="detail-item"><span class="detail-label">Anos das Publicações</span><div style="margin-top:5px;">${yearsHtml}</div></div>
                         <div class="detail-item"><span class="detail-label">Títulos dos Artigos</span><div style="margin-top:5px;">${titlesHtml}</div></div>
                     `;
@@ -489,14 +292,105 @@
 
                 cy.on('tap', function(evt){
                     if(evt.target === cy){
-                        infoPanel.innerHTML = `<p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar as métricas e detalhes aqui.</p>`;
+                        cy.elements().removeClass('faded highlighted');
+                        infoPanel.innerHTML = `<p style="font-size: 0.9em; color: #666;">Selecione um autor (círculo) ou coautoria (linha) no grafo para visualizar detalhes.</p>`;
                     }
                 });
+
             })
             .catch(err => {
-                document.getElementById('loading').innerHTML = 'Erro ao carregar o JSON. Verifique o ficheiro.';
+                document.getElementById('loading').innerHTML = 'Erro ao carregar o JSON. Verifique o console.';
                 console.error(err);
             });
+
+        function populateUILists(cyInstance) {
+            const authors = new Set(), institutions = new Set(), titles = new Set();
+            let minYear = 9999, maxYear = 0;
+
+            cyInstance.nodes().forEach(node => {
+                const label = node.data('label');
+                const inst = node.data('institution');
+                if(label) authors.add(label);
+                if(inst && inst !== 'Instituição Não Informada') institutions.add(inst);
+            });
+
+            cyInstance.edges().forEach(edge => {
+                if(edge.data('titles')) edge.data('titles').split('|').forEach(t => { if(t.trim()) titles.add(t.trim()); });
+                if(edge.data('years')) edge.data('years').split('|').forEach(y => {
+                    const yearInt = parseInt(y.trim());
+                    if(!isNaN(yearInt)) {
+                        if(yearInt < minYear) minYear = yearInt;
+                        if(yearInt > maxYear) maxYear = yearInt;
+                    }
+                });
+            });
+
+            const authorList = document.getElementById('authorList');
+            Array.from(authors).sort().forEach(a => authorList.insertAdjacentHTML('beforeend', `<option value="${a}">`));
+
+            const titleList = document.getElementById('titleList');
+            Array.from(titles).sort().forEach(t => titleList.insertAdjacentHTML('beforeend', `<option value="${t}">`));
+
+            const instSelect = document.getElementById('instFilter');
+            Array.from(institutions).sort().forEach(i => instSelect.insertAdjacentHTML('beforeend', `<option value="${i}">${i}</option>`));
+
+            if(minYear <= maxYear) {
+                yearSlider.min = minYear - 1; yearSlider.max = maxYear; yearSlider.value = minYear - 1; yearDisplay.textContent = 'Todos';
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('authorInput').value = '';
+            document.getElementById('titleInput').value = '';
+            document.getElementById('instFilter').value = 'todas';
+            yearSlider.value = yearSlider.min; yearDisplay.textContent = 'Todos';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            if(!cy) return;
+            const searchAuthor = document.getElementById('authorInput').value.toLowerCase();
+            const searchTitle = document.getElementById('titleInput').value.toLowerCase();
+            const selectedInst = document.getElementById('instFilter').value;
+            const selectedYear = yearSlider.value > yearSlider.min ? yearSlider.value : 'todos';
+
+            cy.elements().removeClass('faded highlighted');
+
+            if (searchAuthor === '' && searchTitle === '' && selectedInst === 'todas' && selectedYear === 'todos') return;
+
+            let nodesToKeep = cy.collection(), edgesToKeep = cy.collection();
+
+            cy.elements().forEach(ele => {
+                if (ele.isNode()) {
+                    let matchInst = selectedInst === 'todas' || ele.data('institution') === selectedInst;
+                    let matchAuthor = searchAuthor === '' || (ele.data('label') && ele.data('label').toLowerCase().includes(searchAuthor));
+                    if (matchInst && matchAuthor && searchTitle === '' && selectedYear === 'todos') nodesToKeep = nodesToKeep.union(ele);
+                } else if (ele.isEdge()) {
+                    let matchTitle = searchTitle === '' || (ele.data('titles') && ele.data('titles').toLowerCase().includes(searchTitle));
+                    let matchYear = selectedYear === 'todos' || (ele.data('years') && ele.data('years').includes(selectedYear.toString()));
+                    if(matchTitle && matchYear) {
+                        edgesToKeep = edgesToKeep.union(ele);
+                        nodesToKeep = nodesToKeep.union(ele.connectedNodes());
+                    }
+                }
+            });
+
+            if (searchAuthor !== '' || selectedInst !== 'todas') {
+                nodesToKeep = cy.nodes().filter(n => {
+                    return (selectedInst === 'todas' || n.data('institution') === selectedInst) && 
+                           (searchAuthor === '' || (n.data('label') && n.data('label').toLowerCase().includes(searchAuthor)));
+                });
+                edgesToKeep = nodesToKeep.connectedEdges().filter(e => {
+                    return (searchTitle === '' || (e.data('titles') && e.data('titles').toLowerCase().includes(searchTitle))) &&
+                           (selectedYear === 'todos' || (e.data('years') && e.data('years').includes(selectedYear.toString())));
+                });
+                if(searchTitle !== '' || selectedYear !== 'todos') nodesToKeep = edgesToKeep.connectedNodes().intersection(nodesToKeep);
+            }
+
+            const elementsToKeep = nodesToKeep.union(edgesToKeep);
+            cy.elements().difference(elementsToKeep).addClass('faded');
+            elementsToKeep.addClass('highlighted');
+        }
     </script>
 </body>
 </html>
