@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MapBiomas - Publication Networks</title>
     
-    <!-- Biblioteca Principal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-    
-    <!-- Bibliotecas de Layout fCoSE (Para física ultra-rápida em redes gigantes) -->
     <script src="https://unpkg.com/layout-base/layout-base.js"></script>
     <script src="https://unpkg.com/cose-base/cose-base.js"></script>
     <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
@@ -47,16 +44,63 @@
         .btn-clear { background-color: #eee; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; color: #555; }
         .btn-clear:hover { background-color: #ddd; }
 
-        /* Fundo branco e limpo */
+        /* Contêiner do Grafo com Cursor de Mão */
         #cy-container { flex-grow: 1; background: #ffffff; border: 1px solid var(--mb-card-border); border-radius: 8px; position: relative; overflow: hidden; }
-        #cy { width: 100%; height: 100%; }
+        #cy { width: 100%; height: 100%; cursor: grab; }
+        #cy:active { cursor: grabbing; } /* Cursor muda ao arrastar */
+        
         #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2em; color: #666; background: rgba(255,255,255,0.9); padding: 20px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+        /* Estilos da Legenda Flutuante */
+        #legend-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 40%; /* Permite scroll se houver muitas categorias */
+            overflow-y: auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 50;
+            min-width: 200px;
+        }
+        #legend-container h4 { margin: 0 0 10px 0; font-size: 0.95em; color: #333; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; font-size: 0.85em; color: #555; }
+        .legend-color { width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; border: 1px solid #999; flex-shrink: 0;}
+
+        /* Estilos dos Botões de Zoom */
+        #zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 50;
+        }
+        .zoom-btn {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 36px;
+            height: 36px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:hover { background: #f0f0f0; color: var(--mb-dark-green); }
 
         .detail-item { margin-bottom: 12px; font-size: 0.9em; }
         .detail-label { font-weight: 600; color: #666; display: block; font-size: 0.85em;}
         .detail-value { color: var(--mb-text-main); word-wrap: break-word;}
         .tag { background: #e9ecef; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px 2px 2px 0; display: inline-block;}
-        .color-legend { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
     </style>
 </head>
 <body>
@@ -79,7 +123,6 @@
         <aside class="card" id="sidebar-left">
             <h3>Filtros & Aparência</h3>
             
-            <!-- NOVO: Dropdown para colorir os nós -->
             <div class="filter-group">
                 <label for="colorAttribute">Colorir Nós Por:</label>
                 <select id="colorAttribute">
@@ -109,6 +152,20 @@
 
         <section id="cy-container">
             <div id="loading">A calcular a física da rede. Por favor aguarde...</div>
+            
+            <!-- Painel de Legenda Flutuante -->
+            <div id="legend-container">
+                <h4 id="legend-title">Legenda</h4>
+                <div id="legend-content"></div>
+            </div>
+
+            <!-- Botões de Zoom -->
+            <div id="zoom-controls">
+                <button class="zoom-btn" id="btn-zoom-in" title="Aproximar">+</button>
+                <button class="zoom-btn" id="btn-zoom-out" title="Afastar">-</button>
+                <button class="zoom-btn" id="btn-zoom-fit" title="Enquadrar Rede">⛶</button>
+            </div>
+
             <div id="cy"></div>
         </section>
 
@@ -131,46 +188,54 @@
             applyFilters();
         });
 
-        // Paleta de cores ampliada para suportar muitos tópicos ou subcampos diferentes
+        // Paleta de cores ampla
         const palette = [
-            '#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f',
-            '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
-            '#393b79','#5254a3','#6b6ecf','#9c9ede','#637939','#8ca252','#b5cf6b','#cedb9c','#8c6d31','#bd9e39','#e7ba52','#e7cb94',
-            '#843c39','#ad494a','#d6616b','#e7969c','#7b4173','#a55194','#ce6dbd','#de9ed6'
+            '#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999',
+            '#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#bc80bd',
+            '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#17becf'
         ];
 
-        // Função para colorir os nós consoante um atributo específico (domain, field, etc.)
+        // Atualiza Cores dos Nós E a Legenda na tela
         function updateNodeColors(attribute, elementsArray = null) {
             const colorMap = {};
             let cIndex = 0;
             
-            if (cy) {
-                // Se a rede já foi carregada, atualizamos na hora de forma rápida usando "batch"
-                cy.batch(() => {
-                    cy.nodes().forEach(node => {
-                        let val = node.data(attribute) || 'Desconhecido';
-                        if (!colorMap[val]) {
-                            colorMap[val] = palette[cIndex % palette.length];
-                            cIndex++;
-                        }
-                        node.data('node_color', colorMap[val]); // Altera a cor dinamicamente
-                    });
-                });
-            } else if (elementsArray) {
-                // Executado apenas na primeira vez antes de iniciar o Cytoscape
-                let nodesArray = elementsArray.nodes ? elementsArray.nodes : elementsArray.filter(e => !e.data.source);
-                nodesArray.forEach(node => {
-                    let val = node.data[attribute] || 'Desconhecido';
-                    if (!colorMap[val]) {
-                        colorMap[val] = palette[cIndex % palette.length];
-                        cIndex++;
-                    }
+            // Geração das cores
+            let nodesArray = cy ? cy.nodes() : (elementsArray.nodes ? elementsArray.nodes : elementsArray.filter(e => !e.data.source));
+            
+            nodesArray.forEach(node => {
+                let val = cy ? node.data(attribute) : node.data[attribute];
+                val = val || 'Desconhecido';
+                
+                if (!colorMap[val]) {
+                    colorMap[val] = palette[cIndex % palette.length];
+                    cIndex++;
+                }
+                
+                if (cy) {
+                    node.data('node_color', colorMap[val]);
+                } else {
                     node.data.node_color = colorMap[val];
-                });
-            }
+                }
+            });
+
+            // Atualização do HTML da Legenda
+            const legendTitle = document.getElementById('colorAttribute').options[document.getElementById('colorAttribute').selectedIndex].text;
+            document.getElementById('legend-title').textContent = `Legenda: ${legendTitle}`;
+            
+            let legendHtml = '';
+            // Ordenar categorias alfabeticamente
+            Object.keys(colorMap).sort().forEach(key => {
+                legendHtml += `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: ${colorMap[key]}"></div>
+                        <span>${key}</span>
+                    </div>
+                `;
+            });
+            document.getElementById('legend-content').innerHTML = legendHtml;
         }
 
-        // Listener do menu suspenso de Cores
         document.getElementById('colorAttribute').addEventListener('change', function(e) {
             updateNodeColors(e.target.value);
         });
@@ -179,7 +244,6 @@
             .then(response => response.json())
             .then(data => {
                 
-                // Antes de carregar o gráfico, colore os nós usando o valor selecionado por defeito (domain)
                 const defaultColorAttribute = document.getElementById('colorAttribute').value;
                 updateNodeColors(defaultColorAttribute, data);
 
@@ -190,27 +254,32 @@
                         {
                             selector: 'node',
                             style: {
-                                'background-color': 'data(node_color)', // A cor que foi processada pelo JS
+                                'background-color': 'data(node_color)',
                                 
-                                'width': function(ele) { return Math.max(5, ele.data('degree_centrality') * 2000); },
-                                'height': function(ele) { return Math.max(5, ele.data('degree_centrality') * 2000); },
+                                // NÓS MAIORES: Aumentado o valor mínimo para 15px e o multiplicador
+                                'width': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 5000); },
+                                'height': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 5000); },
                                 
-                                'label': function(ele) { return ele.data('degree_centrality') > 0.005 ? ele.data('label') : ''; },
-                                'font-size': function(ele) { return Math.max(10, ele.data('degree_centrality') * 800); },
+                                // RÓTULOS OCULTOS NO ZOOM OUT
+                                'label': 'data(label)',
+                                'font-size': '14px',
+                                // min-zoomed-font-size esconde o texto se a câmara estiver muito afastada
+                                'min-zoomed-font-size': 6,
                                 
-                                'color': '#000',
+                                'color': '#222',
                                 'text-valign': 'center',
                                 'text-halign': 'right',
-                                'text-margin-x': 4,
-                                'border-width': 0.5,
-                                'border-color': '#fff'
+                                'text-margin-x': 6,
+                                'border-width': 1,
+                                'border-color': '#ffffff'
                             }
                         },
                         {
                             selector: 'edge',
                             style: {
-                                'width': 0.3,
-                                'line-color': '#d3d3d3',
+                                // ARESTAS MAIS VISÍVEIS
+                                'width': function(ele) { return Math.max(1, (ele.data('weight') || 1) * 0.8); },
+                                'line-color': '#aaaaaa', // Cor mais escura
                                 'opacity': 0.5,
                                 'curve-style': 'haystack'
                             }
@@ -219,10 +288,12 @@
                             selector: '.highlighted',
                             style: {
                                 'background-color': '#FF5722',
+                                'border-color': '#000',
+                                'border-width': 2,
                                 'z-index': 999,
                                 'opacity': 1,
-                                'label': 'data(label)',
-                                'font-size': '16px'
+                                'font-size': '18px',
+                                'min-zoomed-font-size': 0 // Rótulo forçado a aparecer quando filtrado
                             }
                         },
                         {
@@ -232,12 +303,15 @@
                     ],
                     layout: {
                         name: 'fcose',
-                        quality: 'default',
+                        quality: 'draft',
                         randomize: true,
-                        animate: false,
-                        nodeRepulsion: 45000,
+                        animate: true,
+                        animationDuration: 2500,
+                        fit: true,
+                        nodeRepulsion: 15000,
                         idealEdgeLength: 50,
-                        gravity: 0.05
+                        gravity: 0.1,
+                        numIter: 1000
                     }
                 });
 
@@ -245,6 +319,11 @@
                     document.getElementById('loading').style.display = 'none';
                     populateUILists(cy);
                 });
+
+                // Lógica dos Botões de Zoom
+                document.getElementById('btn-zoom-in').addEventListener('click', () => { cy.zoom(cy.zoom() * 1.3); });
+                document.getElementById('btn-zoom-out').addEventListener('click', () => { cy.zoom(cy.zoom() * 0.7); });
+                document.getElementById('btn-zoom-fit').addEventListener('click', () => { cy.fit(cy.elements(), 30); });
 
                 document.getElementById('authorInput').addEventListener('input', applyFilters);
                 document.getElementById('titleInput').addEventListener('input', applyFilters);
@@ -259,12 +338,12 @@
                     infoPanel.innerHTML = `
                         <div class="detail-item"><span class="detail-label">Autor</span><span class="detail-value" style="font-size:1.1em; font-weight:bold; color:var(--mb-dark-green);">${d.label}</span></div>
                         <div class="detail-item"><span class="detail-label">Instituição</span><span class="detail-value">${d.institution || 'N/A'}</span></div>
-                        <div class="detail-item"><span class="detail-label">Centralidade (Importância)</span><span class="detail-value">${(d.degree_centrality).toFixed(4)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Centralidade (Grau)</span><span class="detail-value">${(d.degree_centrality || 0).toFixed(4)}</span></div>
                         <hr style="border:0; border-top:1px dashed #ccc; margin:15px 0;">
                         <div class="detail-item">
                             <span class="detail-label">Cor atual representa (${colorAttr}):</span>
-                            <div style="margin-top: 5px;">
-                                <span class="color-legend" style="background-color: ${d.node_color}"></span>
+                            <div style="margin-top: 5px; display: flex; align-items: center;">
+                                <span class="legend-color" style="background-color: ${d.node_color}; display: inline-block;"></span>
                                 <b>${colorCategoryValue}</b>
                             </div>
                         </div>
@@ -285,6 +364,7 @@
 
                     infoPanel.innerHTML = `
                         <div class="detail-item"><span class="detail-label">Coautoria Entre</span><span class="detail-value"><b>${source}</b> <br>&amp;<br> <b>${target}</b></span></div>
+                        <div class="detail-item"><span class="detail-label">Total de Artigos Juntos</span><span class="detail-value">${d.weight || 1}</span></div>
                         <div class="detail-item"><span class="detail-label">Anos das Publicações</span><div style="margin-top:5px;">${yearsHtml}</div></div>
                         <div class="detail-item"><span class="detail-label">Títulos dos Artigos</span><div style="margin-top:5px;">${titlesHtml}</div></div>
                     `;
