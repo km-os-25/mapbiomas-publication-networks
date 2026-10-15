@@ -7,6 +7,9 @@
     
     <!-- Biblioteca Cytoscape -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
 
     <!-- Biblioteca do Slider Duplo (noUiSlider) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css" />
@@ -55,12 +58,13 @@
         .filter-group label { display: block; font-size: 0.85em; font-weight: 600; color: #666; margin-bottom: 6px; }
         .filter-group input[type="text"] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         
-        .radio-group label { display: flex; align-items: center; font-size: 0.9em; color: #444; margin-bottom: 5px; cursor: pointer; font-weight: normal; }
-        .radio-group input { margin-right: 8px; cursor: pointer;}
+        .radio-group label { display: flex; align-items: center; font-size: 0.9em; color: #444; margin-bottom: 8px; cursor: pointer; font-weight: normal; }
+        .radio-group input { margin-right: 8px; cursor: pointer; width: 16px; height: 16px;}
 
         .btn-clear { background-color: #eee; border: none; padding: 8px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; color: #555; }
         .btn-clear:hover { background-color: #ddd; }
 
+        /* Cursor de navegação */
         #cy-container { flex-grow: 1; background: #ffffff; border: 1px solid var(--mb-card-border); border-radius: 8px; position: relative; overflow: hidden; }
         #cy { width: 100%; height: 100%; cursor: grab; }
         #cy:active { cursor: grabbing; }
@@ -76,6 +80,7 @@
         .legend-color { width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; border: 1px solid #999; flex-shrink: 0;}
         .legend-info-box { font-size: 0.85em; color: #444; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #ccc; }
         
+        /* Controles de Zoom */
         #zoom-controls { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
         .zoom-btn { background: white; border: 1px solid #ccc; border-radius: 4px; width: 36px; height: 36px; font-size: 1.2em; font-weight: bold; color: #555; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
         .zoom-btn:hover { background: #f0f0f0; color: var(--mb-dark-green); }
@@ -138,11 +143,11 @@
                 <div class="legend-info-box">
                     <div style="display:flex; align-items:center; margin-bottom:6px;">
                         <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:#888; margin-right:8px;"></span> 
-                        <b>Nó:</b> Autor da Publicação
+                        <b>Nó:</b> Autor
                     </div>
                     <div style="display:flex; align-items:center;">
                         <span style="display:inline-block; width:16px; height:3px; background:#888; margin-right:6px;"></span> 
-                        <b>Aresta:</b> Coautoria em Trabalhos
+                        <b>Aresta:</b> Coautoria
                     </div>
                 </div>
                 <h4 id="legend-title">Legenda</h4>
@@ -168,6 +173,8 @@
 
     <script>
         let cy;
+        let globalMinYear = 2017;
+        let globalMaxYear = 2026;
         
         document.getElementById('toggle-sidebar').addEventListener('click', function() {
             document.getElementById('sidebar-left').classList.toggle('closed');
@@ -195,8 +202,8 @@
         });
 
         const palette = [
-            '#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999',
-            '#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#bc80bd',
+            '#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#a65628','#f781bf','#999999',
+            '#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#bc80bd',
             '#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#17becf'
         ];
 
@@ -244,6 +251,42 @@
             .then(response => response.json())
             .then(data => {
                 
+                let hasPositions = false;
+                let nodesArray = data.nodes ? data.nodes : data.filter(e => !e.data.source);
+                
+                // MÁGICA DA NORMALIZAÇÃO: Enquadra qualquer layout exportado do Python para ficar perfeitamente visível
+                if (nodesArray.length > 0 && nodesArray[0].position && nodesArray[0].position.x !== undefined) {
+                    hasPositions = true;
+                    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                    
+                    nodesArray.forEach(n => {
+                        let px = parseFloat(n.position.x);
+                        let py = parseFloat(n.position.y);
+                        if (!isNaN(px) && !isNaN(py)) {
+                            if(px < minX) minX = px;
+                            if(px > maxX) maxX = px;
+                            if(py < minY) minY = py;
+                            if(py > maxY) maxY = py;
+                        }
+                    });
+                    
+                    const spanX = maxX - minX || 1;
+                    const spanY = maxY - minY || 1;
+                    const maxSpan = Math.max(spanX, spanY);
+                    
+                    // Escala base segura para web (Cria um quadro virtual de 6000 pixels)
+                    const scaleFactor = 6000 / maxSpan; 
+                    
+                    nodesArray.forEach(n => {
+                        let px = parseFloat(n.position.x);
+                        let py = parseFloat(n.position.y);
+                        if (!isNaN(px) && !isNaN(py)) {
+                            n.position.x = (px - minX - spanX/2) * scaleFactor;
+                            n.position.y = (py - minY - spanY/2) * scaleFactor;
+                        }
+                    });
+                }
+
                 const defaultColorAttribute = document.querySelector('input[name="colorAttr"]:checked').value;
                 updateNodeColors(defaultColorAttribute, data);
 
@@ -255,25 +298,29 @@
                             selector: 'node',
                             style: {
                                 'background-color': 'data(node_color)',
-                                'width': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 8000); },
-                                'height': function(ele) { return Math.max(15, (ele.data('degree_centrality') || 0) * 8000); },
-                                'label': 'data(label)',
-                                'font-size': '14px',
+                                'width': function(ele) { return Math.max(18, (parseFloat(ele.data('degree_centrality')) || 0) * 10000); },
+                                'height': function(ele) { return Math.max(18, (parseFloat(ele.data('degree_centrality')) || 0) * 10000); },
+                                
+                                // Exibe labels apenas nos nós mais importantes (evita ecrã poluído)
+                                'label': function(ele) { return parseFloat(ele.data('degree_centrality')) > 0.003 ? ele.data('label') : ''; },
+                                'font-size': '16px',
                                 'color': '#222',
-                                'min-zoomed-font-size': 6,
+                                
+                                // Oculta os rótulos de longe
+                                'min-zoomed-font-size': 7,
                                 'text-valign': 'center',
                                 'text-halign': 'right',
                                 'text-margin-x': 6,
-                                'border-width': 1,
+                                'border-width': 1.5,
                                 'border-color': '#fff'
                             }
                         },
                         {
                             selector: 'edge',
                             style: {
-                                'width': function(ele) { return Math.max(1, (ele.data('weight') || 1) * 1.2); },
-                                'line-color': '#888888',
-                                'opacity': 0.6,
+                                'width': function(ele) { return Math.max(1.5, (ele.data('weight') || 1) * 1.5); },
+                                'line-color': '#999999',
+                                'opacity': 0.7,
                                 'curve-style': 'haystack'
                             }
                         },
@@ -282,10 +329,10 @@
                             style: {
                                 'background-color': '#FF5722',
                                 'border-color': '#000',
-                                'border-width': 3,
+                                'border-width': 4,
                                 'z-index': 999,
                                 'opacity': 1,
-                                'font-size': '20px',
+                                'font-size': '24px',
                                 'min-zoomed-font-size': 0
                             }
                         },
@@ -294,12 +341,10 @@
                             style: { 'opacity': 0.05, 'text-opacity': 0 }
                         }
                     ],
-                    // LAYOUT PRESET: Lê o X e Y calculados pelo ForceAtlas2 no Python (Não congela!)
-                    layout: {
-                        name: 'preset',
-                        fit: true,
-                        padding: 30
-                    }
+                    // Deteção Dinâmica: Lê o JSON do Python ou calcula em JS como redundância
+                    layout: hasPositions 
+                        ? { name: 'preset', fit: true, padding: 30 } 
+                        : { name: 'fcose', quality: 'draft', randomize: true, animate: true, animationDuration: 2000, fit: true, nodeRepulsion: 15000, idealEdgeLength: 50, gravity: 0.1, numIter: 1000 }
                 });
 
                 cy.ready(function() {
@@ -349,7 +394,7 @@
 
                 html += `<div class="detail-item"><span class="detail-label">Autor Principal</span><span class="detail-value" style="font-size:1.1em; font-weight:bold; color:var(--mb-dark-green);">${d.label}</span></div>`;
                 html += `<div class="detail-item"><span class="detail-label">Instituição Registada</span><span class="detail-value">${d.institution || 'N/A'}</span></div>`;
-                html += `<div class="detail-item"><span class="detail-label">Relevância na Rede (Centralidade)</span><span class="detail-value">${(d.degree_centrality || 0).toFixed(4)}</span></div>`;
+                html += `<div class="detail-item"><span class="detail-label">Relevância na Rede (Centralidade)</span><span class="detail-value">${(parseFloat(d.degree_centrality) || 0).toFixed(4)}</span></div>`;
                 html += `<div class="detail-item">
                             <span class="detail-label">Área Atribuída (${colorAttr})</span>
                             <div style="margin-top: 3px; display: flex; align-items: center;">
@@ -416,7 +461,8 @@
 
         function populateUILists(cyInstance) {
             const authors = new Set(), titles = new Set();
-            
+            let minYear = 9999, maxYear = 0;
+
             cyInstance.nodes().forEach(node => {
                 const label = node.data('label');
                 if(label) authors.add(label);
@@ -424,6 +470,13 @@
 
             cyInstance.edges().forEach(edge => {
                 if(edge.data('titles')) edge.data('titles').split('|').forEach(t => { if(t.trim()) titles.add(t.trim()); });
+                if(edge.data('years')) edge.data('years').split('|').forEach(y => {
+                    const yearInt = parseInt(y.trim());
+                    if(!isNaN(yearInt)) {
+                        if(yearInt < minYear) minYear = yearInt;
+                        if(yearInt > maxYear) maxYear = yearInt;
+                    }
+                });
             });
 
             const authorList = document.getElementById('authorList');
@@ -431,12 +484,20 @@
 
             const titleList = document.getElementById('titleList');
             Array.from(titles).sort().forEach(t => titleList.insertAdjacentHTML('beforeend', `<option value="${t}">`));
+
+            if(minYear <= maxYear) {
+                globalMinYear = minYear;
+                globalMaxYear = maxYear;
+                slider.noUiSlider.updateOptions({ range: { 'min': minYear, 'max': maxYear } });
+                slider.noUiSlider.set([minYear, maxYear]);
+                document.getElementById('yearDisplay').textContent = `${minYear} - ${maxYear}`;
+            }
         }
 
         function clearFilters() {
             document.getElementById('authorInput').value = '';
             document.getElementById('titleInput').value = '';
-            slider.noUiSlider.set([2017, 2026]);
+            slider.noUiSlider.set([globalMinYear, globalMaxYear]);
             applyFilters();
         }
 
@@ -451,7 +512,7 @@
 
             cy.elements().removeClass('faded highlighted');
 
-            if (searchAuthor === '' && searchTitle === '' && startYear === 2017 && endYear === 2026) {
+            if (searchAuthor === '' && searchTitle === '' && startYear === globalMinYear && endYear === globalMaxYear) {
                 cy.animate({ fit: { padding: 30 } }, { duration: 600 });
                 return;
             }
@@ -462,14 +523,14 @@
             cy.elements().forEach(ele => {
                 if (ele.isNode()) {
                     let matchAuthor = searchAuthor === '' || (ele.data('label') && ele.data('label').toLowerCase().includes(searchAuthor));
-                    if (matchAuthor && searchTitle === '' && startYear === 2017 && endYear === 2026) {
+                    if (matchAuthor && searchTitle === '' && startYear === globalMinYear && endYear === globalMaxYear) {
                         nodesToKeep = nodesToKeep.union(ele);
                     }
                 } else if (ele.isEdge()) {
                     let matchTitle = searchTitle === '' || (ele.data('titles') && ele.data('titles').toLowerCase().includes(searchTitle));
-                    
                     let matchYear = false;
-                    if (startYear === 2017 && endYear === 2026) {
+                    
+                    if (startYear === globalMinYear && endYear === globalMaxYear) {
                         matchYear = true;
                     } else if (ele.data('years')) {
                         let yArr = ele.data('years').split('|').map(y=>parseInt(y.trim()));
@@ -487,14 +548,14 @@
                 nodesToKeep = cy.nodes().filter(n => n.data('label') && n.data('label').toLowerCase().includes(searchAuthor));
                 edgesToKeep = nodesToKeep.connectedEdges().filter(e => {
                     let matchTitle = searchTitle === '' || (e.data('titles') && e.data('titles').toLowerCase().includes(searchTitle));
-                    let matchYear = (startYear === 2017 && endYear === 2026);
+                    let matchYear = (startYear === globalMinYear && endYear === globalMaxYear);
                     if (!matchYear && e.data('years')) {
                         let yArr = e.data('years').split('|').map(y=>parseInt(y.trim()));
                         matchYear = yArr.some(y => y >= startYear && y <= endYear);
                     }
                     return matchTitle && matchYear;
                 });
-                if(searchTitle !== '' || startYear !== 2017 || endYear !== 2026) {
+                if(searchTitle !== '' || startYear !== globalMinYear || endYear !== globalMaxYear) {
                     nodesToKeep = edgesToKeep.connectedNodes().intersection(nodesToKeep);
                 }
             }
@@ -503,9 +564,10 @@
             cy.elements().difference(elementsToKeep).addClass('faded');
             elementsToKeep.removeClass('faded').addClass('highlighted');
 
+            // Anima a câmara para focar o alvo da pesquisa (com zoom adequado)
             if (searchAuthor !== '' || searchTitle !== '') {
                 if(elementsToKeep.length > 0) {
-                    cy.animate({ fit: { eles: elementsToKeep, padding: 60 } }, { duration: 800 });
+                    cy.animate({ fit: { eles: elementsToKeep, padding: 80 } }, { duration: 800 });
                 }
             }
         }
